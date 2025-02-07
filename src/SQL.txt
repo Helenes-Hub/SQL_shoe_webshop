@@ -1,0 +1,376 @@
+-- BYGGER DATABASEN
+
+drop database if exists Shoe_Webshop;
+create database Shoe_Webshop;
+use Shoe_Webshop;
+
+-- NORMALISERING: Vi har postkod och stad i samma tabell  för rimligthetens
+-- och överskådlighetens skull
+create table Customer
+(id int not null auto_increment primary key,
+name varchar(100) not null,
+password varchar(100) not null,
+streetAddress varchar(30) not null,
+areaCode char(6) not null,
+city varchar (30) not null
+);
+
+-- INTEGRITET: Om en kund kräver att bli avregistrerad vill vi spara order-
+-- historiken för försäljningsstatestik, så vi använder “on delete set null”
+create table Orders
+(id int not null auto_increment primary key,
+customerId int,
+foreign key (customerId) references Customer(id) on delete set null,
+orderDate date not null,
+totalPrice double,
+isActive boolean default true
+);
+
+create table Color
+(id int not null auto_increment primary key,
+name varchar(30) not null,
+unique (name)
+);
+
+create table Category
+(id int not null auto_increment primary key,
+name varchar(30) not null,
+unique (name)
+);
+
+create table Brand
+(id int not null auto_increment primary key,
+name varchar(30) not null,
+unique (name)
+);
+
+-- NORMALISERING: Vi har name och theme i samma tabell trots att det kan bryta mot 3NF.
+-- Smidigt och intuitivt,  och det är möjligt att flera märken har teman som “Summer”,
+--  “Floral”etc.
+create table Shoe
+(id int not null auto_increment primary key,
+name varchar(30) not null,
+theme varchar(30),
+shoeSize int not null,
+price double not null
+);
+
+-- NORMALISERING: syntetisk nyckel så att man kan beställa dubbletter utan normaliseringsfel.
+-- INTEGRITET: Om en order makuleras vill vi inte att information om ordern sparas
+-- i Order_table, så vi sätter “on delete cascade”.
+create table Order_Table
+(id int not null auto_increment primary key,
+orderId int not null,
+foreign key (orderId) references Orders(id) on delete cascade,
+shoeId int not null,
+foreign key (shoeId) references Shoe(id)
+);
+
+create table Category_Table
+(categoryId int not null,
+foreign key (categoryId) references Category(id),
+shoeId int not null,
+foreign key (shoeId) references Shoe(id)
+);
+
+create table Color_Table
+(colorId int not null,
+foreign key (colorId) references Color(id),
+shoeId int not null,
+foreign key (shoeId) references Shoe(id)
+);
+
+create table Brand_Table
+(brandId int not null,
+foreign key (brandId) references Brand(id),
+shoeId int not null,
+foreign key (shoeId) references Shoe(id)
+);
+
+create table Stock
+(id int not null auto_increment primary key,
+shoeId int not null,
+foreign key (shoeId) references Shoe(Id),
+status int not null
+);
+
+create table Expired
+(id int not null auto_increment primary key,
+shoeId int not null,
+foreign key (shoeId) references Shoe(Id),
+expiredDate datetime default now()
+);
+
+create table notifications (
+    id int not null auto_increment primary key,
+    message varchar(255) not null,
+    created_at datetime default now()
+);
+
+-- INDEX:  Alla primary – och foreign keys och alla kategori - och färgnamn är autoindexerade.
+-- Det var dessa vi tyckte var viktigast.
+-- Vi la extra index på Customer.city för sökning av försäljningsstatistik och Shoe.price för
+-- att man lätt ska kunna söka fram skor i olika priskategorier.
+create index IX_city on Customer(city);
+create index IX_price on Shoe(price);
+
+-- LÄGGER IN VÄRDEN I TABELLERNA
+
+insert into Customer (name, streetAddress, areaCode, city, password) values
+('Ada Lovelace', 'Pioneer Road', '12 345', 'History', '1'),
+('Gullan von', 'Arkadien', '75 333', 'Uppsala','2'),
+('Arlo Almighty', '1337 Street', '10 101', 'Cyber Space', '3'),
+('Hedy Lamarr', 'Walk of Fame', '12 346', 'History', '4'),
+('P. Kalkyl', 'Hergégatan', '62 345', 'Bryssel','5'),
+('Bianca Castafiore', 'Callas Boulevard', '62 345', 'Bryssel','hej');
+
+insert into Orders (customerId, orderDate, isActive)values
+(3, '2024-02-02', true),
+(6, '2024-03-12', true),
+(6, '2024-03-14', false),
+(1, '2024-05-03', false),
+(5, '2024-06-03', false),
+(2, '2024-07-10', false),
+(4, '2024-08-21', true),
+(6, '2024-10-14', false);
+
+insert into Color (name) values
+('white'),
+('red'),
+('blue'),
+('brown'),
+('disco beige'),
+('glossy black'),
+('matte black');
+
+insert into Category (name) values
+('hiking'),
+('formal'),
+('winter'),
+('summer'),
+('sport'),
+('ballet'),
+('djungle'),
+('sandal'),
+('cat burglar');
+
+insert into Brand (name) values
+('Fruit Loops'),
+('AI Technocracy'),
+('Cinderella'),
+('Perdy Paw'),
+('Ecco'),
+('KickAss');
+
+insert into Shoe (name, theme, shoeSize, price) values
+('Gunhild', 'Velvet', 37, 500),
+('Gunhild', 'Velvet', 38, 500),
+
+('Gunhild', 'Froté', 37, 350),
+('Gunhild', 'Froté', 38, 350),
+
+('Sparkles', 'Void', 39, 400),
+('Sparkles', 'Void',  40, 400),
+
+('Sparkles', 'Sprinkles', 38, 400),
+('Sparkles', 'Sprinkles', 39, 400),
+
+('Floppy flip', 'Beach', 38, 300),
+('Floppy flip', 'Beach', 39, 300),
+
+('Luftig', 'Breezy', 37, 350),
+('Luftig', 'Breezy', 38, 350),
+
+('Break a Leg', null , 40, 350),
+('Break a Leg', null , 41, 350);
+
+insert into Order_Table(orderId, shoeId) values
+(1, 1),
+(1, 6),
+(2, 2),
+(2, 13),
+(2, 4),
+(3, 7),
+(4, 10),
+(4, 7),
+(5, 11),
+(5, 3),
+(6, 6),
+(6, 13),
+(7, 8),
+(7, 8),
+(7, 8),
+(8, 7),
+(8, 13);
+
+insert into Category_Table (categoryId, shoeId) values
+(4, 1),
+(8, 1),
+(4, 2),
+(8, 2),
+(4, 3),
+(8, 3),
+(4, 4),
+(8, 4),
+(2, 5),
+(2, 6),
+(2, 7),
+(2, 8),
+(8, 9),
+(9, 9),
+(8, 10),
+(9, 10),
+(3, 11),
+(8, 11),
+(3, 12),
+(8, 12),
+(5, 13),
+(6, 13),
+(5, 14),
+(6, 14);
+
+insert into Color_Table (colorId, shoeId) values
+(6, 1),
+(6, 2),
+(5, 3),
+(5, 4),
+(4, 3),
+(4, 4),
+(3, 5),
+(3, 6),
+(2, 7),
+(2, 8),
+(1, 7),
+(1, 8),
+(3, 9),
+(3, 10),
+(1, 11),
+(1, 12),
+(7, 11),
+(7, 12),
+(6, 13),
+(6, 14);
+
+insert into Brand_Table (brandId, shoeId) values
+(5, 1),
+(5, 2),
+(5, 3),
+(5, 4),
+(2, 5),
+(2, 6),
+(2, 7),
+(2, 8),
+(4, 9),
+(4, 10),
+(3, 11),
+(3, 12),
+(6, 13),
+(6, 14);
+
+insert into Stock (shoeId, status) values
+(1, 1),
+(2, 2),
+(3, 10),
+(4, 8),
+(5, 15),
+(6, 7),
+(7, 12),
+(8, 9),
+(9, 15),
+(10, 20),
+(11, 4),
+(12, 9),
+(13, 40),
+(14, 3);
+
+delimiter //
+
+CREATE PROCEDURE `buyShoe`(in shopCustomerId int, in shopShoeId int, out feedback varchar(50))
+BEGIN
+
+declare lastId int;
+declare stockquantity int;
+declare activeID int;
+declare stockEmpty int;
+
+declare exit handler for sqlexception
+begin
+	rollback;
+    resignal set message_text = 'Oväntat fel inträffade, köpet har inte fullföljts';
+end;
+
+set autocommit=0;
+set stockempty=0;
+
+-- my_transaction : begin
+start transaction;
+
+select status into stockquantity
+from stock
+where shoeId=shopShoeId;
+
+if stockquantity <=0 then
+	-- select 'Skon är oväntat slut på lagret';
+	rollback;
+    set stockEmpty=1;
+ --   leave my_transaction;
+end if;
+
+
+update stock
+set status = status - 1
+WHERE id = shopShoeId;
+insert into notifications (message) values
+    ('skon har subtraherats från stock');
+
+select id into activeId
+from orders
+where customerId = shopCustomerId and isActive=true;
+
+if activeId is null then
+	insert into orders (customerId, orderDate, isActive) values
+    (shopCustomerId, now(), true);
+	set activeId=last_insert_id();
+
+    insert into notifications (message) values
+    ('fanns ingen aktiv order, en ny har skapats');
+end if;
+
+insert into order_table (orderId, shoeId) values
+(activeId, shopShoeId);
+
+
+if stockEmpty >= 1 then
+rollback;
+set feedback='Skon är slut på lagret';
+end if;
+
+if stockEmpty = 0 then
+set feedback='Ordern blev lagd korrekt';
+commit;
+end if;
+-- end my_transaction;
+
+END//
+delimiter ;
+set autocommit=1;
+
+delimiter //
+CREATE TRIGGER `stock_AFTER_UPDATE` AFTER UPDATE ON `stock` FOR EACH ROW BEGIN
+if new.status=0 and old.status > 0 then
+	insert into expired (shoeId)
+    values (new.shoeId);
+
+    insert into notifications (message) values
+    (concat('sko med id ', new.shoeId, ' är nu slut på lagret, har uppdaterats i expired'));
+end if;
+
+END //
+delimiter ;
+
+
+select * from orders;
+select * from order_table;
+select * from stock;
+select * from notifications;
+select * from expired;
